@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <script src="highcharts.js"></script>
+    <meta charset="UTF-8">
+    <title>Bitcoin</title>
+</head>
+
+<body>
+    <h1>Bitcoin Chart</h1>
+    <div id="container"></div>
+    <input id="from" type="datetime-local" value="2020-01-01T23:00" />
+    <input id="to" type="datetime-local" value="2020-01-31T23:00" />
+
+    <script>
+        var line_chart = {
+
+            chart: {
+                type: 'line'
+            },
+            title: {
+                text: 'Bitcoin Price'
+            },
+            xAxis: {
+                type: 'datetime', // wichtig damit datum richtig angezeigt wird
+            },
+
+            yAxis: [{ // mehrere y achsen; opposite: true -> andere seite
+
+                title: {
+                    text: 'Preis'
+                }
+            }, {
+                title: {
+                    text: 'Volume traded'
+                },
+                opposite: true
+            }],
+            series: [{ // so viele leere series machen die man braucht
+
+            }, {
+
+            }, {
+
+            }],
+            tooltip: { // so schaut besser aus
+                shared: true
+            }
+        }
+
+        var close_grosser_cnt = 0;
+        var close_kleiner_cnt = 0;
+
+        function drawCharts() {
+
+            const startDate = new Date(document.getElementById("from").value).toISOString().substring(0, 10);
+            const endDate = new Date(document.getElementById("to").value).toISOString().substring(0, 10);
+
+            //var url = "https://api.coinpaprika.com/v1/coins/btc-bitcoin/ohlcv/historical?start="+ startDate + "&end=" + endDate;
+            var url = "daten.json";
+
+            var xmlobj = new XMLHttpRequest();
+            xmlobj.open("GET", url, true);
+            xmlobj.send(null);
+            xmlobj.onreadystatechange = function() {
+
+                if (xmlobj.readyState == 4 && xmlobj.status == "200") {
+
+                    console.log("readystate: " + xmlobj.readyState, "status: " + xmlobj.status);
+
+                    const jsonobj = JSON.parse(xmlobj.responseText);
+
+                    var min_preis_data = [];
+                    var max_preis_data = [];
+                    var volume_data = [];
+
+                    var min_preis_entry = [];
+                    var max_preis_entry = [];
+                    var volume_entry = [];
+
+                    var cnt = 0; // damit die highcharts array beim 0. wert aufgefüllt wird
+                    // sonst, wenn ein element aus dem array fehlt (empty): 
+                    //TypeError: Cannot read property 'x' of undefined
+
+                    /* raus suchen die start und end datum 
+                    von wo bis wo der for schleife gehen soll im jsonobj */
+                    for (var i = 0; i < jsonobj.length; i++) {
+
+                        var time = new Date(jsonobj[i].time_close).toISOString().substring(0, 10);
+
+                        if (time == startDate) {
+                            var arrayStart = i;
+                        }
+                        if (time == endDate) {
+                            var arrayEnd = i;
+                            break;
+                        }
+                    }
+                    /*durchgehen der jsonobj*/
+                    for (var i = arrayStart; i <= arrayEnd; i++) {
+
+                        var t = Date.parse(jsonobj[i].time_close);
+                        var min_preis_entry = []; // entrys immer neu definieren damit sie leer sind
+                        var max_preis_entry = []; // entrys immer neu definieren damit sie leer sind
+                        var volume_entry = []; // entrys immer neu definieren damit sie leer sind
+
+                        if (i == 0) {
+                            var close_prise = jsonobj[i].close;
+                            var close_prise_alt = jsonobj[i].close;
+                        } else {
+                            close_prise = jsonobj[i].close;
+                            close_prise_alt = jsonobj[i - 1].close;
+                        }
+
+                        if (close_prise > close_prise_alt) {
+                            close_grosser_cnt++;
+                        }
+                        if (close_prise < close_prise_alt) {
+                            close_kleiner_cnt++;
+                        }
+
+                        min_preis_entry[0] = t; // x-Achse
+                        min_preis_entry[1] = jsonobj[i].low; // y-Achse
+                        min_preis_data[cnt] = min_preis_entry; //datensatz mit x und y werten in die Data array
+
+                        max_preis_entry[0] = t; // x-Achse
+                        max_preis_entry[1] = jsonobj[i].high; // y-Achse
+                        max_preis_data[cnt] = max_preis_entry; //datensatz mit x und y werten in die Data array
+
+                        volume_entry[0] = t; // x-Achse
+                        volume_entry[1] = jsonobj[i].volume; // y-Achse
+                        volume_data[cnt] = volume_entry; //datensatz mit x und y werten in die Data array
+
+                        cnt++; //für die richtige adressierung der Datenarrays
+                    }
+
+                    line_chart.series[0].name = "Min Preis"; // Name der Series programatisch
+                    line_chart.series[0].data = min_preis_data; //Data array dem chart übergeben
+
+                    line_chart.series[1].name = "Max Preis"; // Name der Series programatisch
+                    line_chart.series[1].data = max_preis_data; //Data array dem chart übergeben
+
+                    line_chart.series[2].name = "Volume Traded"; // Name der Series programatisch
+                    line_chart.series[2].data = volume_data; //Data array dem chart übergeben
+                    line_chart.series[2].type = "area"; // Typ und andere eigenschaften programatisch
+                    line_chart.series[2].yAxis = 1; // achse auswählen
+                    line_chart.series[2].opacity = 0.8;
+
+                    Highcharts.chart('container', line_chart); // container: wo der chart gezeichnet werden soll
+                }
+            }
+        }
+
+        function showDayDescription() {
+            // tabelle programatisch erstellen
+            // schauen ob das html element existiert mit !!document.get...
+
+            if ((!!document.getElementById("mytable"))) {
+                document.getElementById("mytable").remove();
+            }
+
+            var table = document.createElement('table');
+            table.setAttribute("id", "mytable");
+
+            var tr = document.createElement('tr');
+
+            var td1 = document.createElement('td');
+            var td2 = document.createElement('td');
+
+            var text1 = document.createTextNode('An ' + close_grosser_cnt + ' Tagen war der "close price" größer');
+            var text2 = document.createTextNode('und an ' + close_kleiner_cnt + ' Tagen war er kleiner als am Tag zuvor.');
+
+            td1.appendChild(text1);
+            td2.appendChild(text2);
+            tr.appendChild(td1);
+            tr.appendChild(td2);
+
+            table.appendChild(tr);
+
+            document.body.appendChild(table);
+        }
+    </script>
+    <button onclick="drawCharts()"> DRAW </button>
+    <button onclick="showDayDescription()"> Show </button>
+</body>
+
+</html>
